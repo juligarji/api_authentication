@@ -1,0 +1,11 @@
+<h1>Account Recovery</h1>
+
+<p>
+  Hi <%= @user.name %>,this look like you forgot your password, but don't worry, you can change it in the next link
+</p>
+<p>
+  <%= ApiAuthentication.account_recovery_callback + '?token=' + @token %>
+<p>
+<p>
+Good Bye !!
+</p>
