@@ -2,59 +2,89 @@ require_dependency "api_authentication/application_controller"
 
 module ApiAuthentication
   class JwtController < ApplicationController
-
+    
     before_action :set_login_params,only: [:log_in]
     before_action :set_sign_up_params,only: [:sign_up]
     before_action :set_recovery_account_params, only: [:account_recovery]
     before_action :set_password_recovery_params, only: [:password_recovery]
+    before_action :set_update_params, only: [:update]
+    before_action :set_search_params, only: [:search]
+
+    before_action :authenticate_all, only: [:log_out,:is_authenticated,:update,:public_data,:send_confirmation,:search]
     
-    before_action :authenticate_user, only: [:log_out,:is_authenticated]
-    
+    # Template for allow only certain values of models
+    #before_action only: [:is_authenticated] do
+    #  authenticate_only('user')
+    #end
+
     def is_authenticated
       render json:{}, status:204
     end
 
     def log_in
       payload = {}
-      user = User.find_by_auth(@user_params[:auth])
+      user = current_model.find_by_auth(@user_params[:auth])
 
+      if user.blank?
+        render json:{error: 'Not Found'}, status: 404
+        return
+      end
+
+      
       if user.try(:authenticate,@user_params[:password])
-        begin
+   
           user.refresh_login_token
 
           render json:{token: user.login_token,valid_until: user.login_token_valid_until},status: 200
-        rescue StandardError => e
-          render json: {error: e.message}, status: 400
-        end
+
       else 
         render json: {}, status: 401
       end
     end
 
-    def log_out
-      user = User.find_by(login_token: request.headers['Authorization'])
-      begin
-        user.refresh_login_token
+    def log_out 
+        current_user_model.refresh_login_token
 
         render json:{}, status: 204
-      rescue StandardError => e
-        render json: {error: e.message}, status: 500
-      end
+    end
+
+    def update
+      current_user_model.update!(@user_params)
+      head :no_content
+    end
+
+    def public_data
+      render json: current_user, status: 200
     end
 
     def sign_up
-      begin
-        User.create!(@user_params)
+        current_model.create!(@user_params)
 
         render json:{}, status:201
-      rescue StandardError => e  
-        render json: {error: e.message}, status: 400
+    end
+
+    # Confirmation Logic
+    def send_confirmation
+      begin
+
+        current_user_model.refresh_confirmation 
+
+        AccountMailer.confirmation(current_user_model,current_user_model.recovery_token, request.base_url).deliver_later
+      
+      rescue Net::SMTPAuthenticationError, Net::SMTPServerBusy, Net::SMTPSyntaxError, Net::SMTPFatalError, Net::SMTPUnknownError => e
+        Rails.logger.info e.message
+        render json:{error: "We are having some troubles sending the confirmation email, please try again later"}, status: 500
       end
+    end
+
+    def confirmates
+      # TODO
+      current_user_model = current_model.find_by(:confirmation_token)
     end
 
     def account_recovery
       if ((not @user_params[:email].blank?) and @user_params[:email].try(:match,/[@.]/) )
-        user = User.find_by(email: @user_params[:email])
+        user = current_model.find_by(email: @user_params[:email])
 
         if user
           begin  
@@ -67,14 +97,12 @@ module ApiAuthentication
             Rails.logger.info e.message
             puts e.message
             render json:{error: "We are having some troubles sending the email, please try again later"}, status: 500
-          rescue StandardError => e
-            render json:{error: e.message}, status: 400
           end
         else
           begin
             AccountMailer.not_exists(@user_params[:email]).deliver_later
           
-          rescue StandardError => e
+          rescue Net::SMTPAuthenticationError, Net::SMTPServerBusy, Net::SMTPSyntaxError, Net::SMTPFatalError, Net::SMTPUnknownError => e
             render json:{error: "We are having some troubles sending the email, please try again later"}, status: 500
           end
         end
@@ -84,12 +112,7 @@ module ApiAuthentication
     end
 
     def password_recovery
-      if @user_params[:email].blank? or @user_params[:password_confirmation].blank? or @user_params[:password].blank? or @user_params[:token].blank?
-        render json:{}, status: 404
-        return
-      end
-
-      if @user_params[:password].length > 18
+      if @user_params[:password].length > 18 || @user_params[:password].length < 6
         render json:{}, status: 400
         return
       end
@@ -99,20 +122,17 @@ module ApiAuthentication
         return
       end
 
-      user = User.find_by(email: @user_params[:email])
+      user = user.find_by(email: @user_params[:email])
       if user
         if user.validate_recovery_token(@user_params[:token])
-          begin
-            
+     
             user.password = @user_params[:password]
             user.password_confirmation = @user_params[:password_confirmation]
             user.recovery_token_valid_until = Time.now
-            user.save!
-
-          rescue StandardError => e
-            render json:{error: e.message}, status: 401
-            return
-          end
+            ActiveRecord::Base.transaction do
+              user.save!
+              user.refresh_login_token
+            end
           render json: {}, status: 201
         else
           render json:{}, status: 404
@@ -122,47 +142,39 @@ module ApiAuthentication
         return
       end
     end
-    
-    private 
 
-      def set_login_params
-        if params.keys.include? 'user'
-          params[:user][:auth] = params[:user][:auth].try(:downcase).try(:gsub!,/\s+/,'') || params[:user][:auth].try(:downcase)
-          
+    def search
+      render json: current_model.search_by_pattern(@user_params[:auth]).map{|x| x.expose }, status: 200
+    end
+
+    private 
+      
+      # params definition
+      def set_login_params         
           @user_params = params.require('user').permit(:auth,:password)
-        else
-            render json: {}, status: 400
-            return false
-        end
+          @user_params[:auth] = @user_params[:auth].try(:gsub!,/\s+/,'') || @user_params[:auth].try(:downcase)
       end
 
       def set_sign_up_params
-        if params.keys.include? 'user'
           @user_params = params.require('user').permit(:username,:email,:name,:lastname,:password,:password_confirmation)
-        else
-          render json: {}, status: 404
-          return false
-        end
       end
 
       def set_recovery_account_params
-        if params.keys.include? 'user'
-          params[:user][:email] = params[:user][:email].try(:downcase).try(:gsub!,/\s+/,'') || params[:user][:email].try(:downcase)
           @user_params = params.require('user').permit(:email)
-        else
-          render json: {}, status: 400
-          return false
-        end
+          @user_params[:email] = @user_params[:email].try(:downcase).try(:gsub!,/\s+/,'') || @user_params[:email].try(:downcase)
       end
 
       def set_password_recovery_params
-        if params.keys.include? 'user'
-          params[:user][:email] = params[:user][:email].try(:downcase).try(:gsub!,/\s+/,'') || params[:user][:email].try(:downcase)
           @user_params = params.require('user').permit(:email,:password,:password_confirmation,:token)
-        else
-          render json: {}, status: 400
-          return false
-        end
+          @user_params[:email] = @user_params[:email].try(:downcase).try(:gsub!,/\s+/,'') || @user_params[:email].try(:downcase)
+      end
+      
+      def set_update_params
+          @user_params = params.require('user').permit(:username,:name,:lastname)
+      end
+
+      def set_search_params
+        @user_params= params.require('user').permit(:auth)
       end
   end
 end

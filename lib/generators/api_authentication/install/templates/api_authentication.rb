@@ -14,8 +14,11 @@ ApiAuthentication.setup do |config|
   config.recovery_email_password = "my-cool-password"
   config.recovery_email_smtp_uri = "smtp.gmail.com"
   config.recovery_email_smtp_port = 587
-  
+   
   # login period
   config.login_days = 10 
+
+  # Confirmable
+  config.confirmable = false
 
 end

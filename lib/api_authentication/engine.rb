@@ -2,7 +2,7 @@ module ApiAuthentication
   class Engine < ::Rails::Engine
     isolate_namespace ApiAuthentication
     config.generators.api_only = true
-
+   
     initializer "api_authentication", before: :load_config_initializers do |app|
       Rails.application.routes.append do
         mount ApiAuthentication::Engine, at: "/api_authentication"
