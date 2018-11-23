@@ -156,7 +156,7 @@ module ApiAuthentication
       end
 
       def set_sign_up_params
-          @user_params = params.require('user').permit(:username,:email,:name,:lastname,:password,:password_confirmation)
+          @user_params = params.require('user').permit(:username,:email,:name,:password,:password_confirmation)
       end
 
       def set_recovery_account_params
@@ -170,7 +170,7 @@ module ApiAuthentication
       end
       
       def set_update_params
-          @user_params = params.require('user').permit(:username,:name,:lastname)
+          @user_params = params.require('user').permit(:username,:name)
       end
 
       def set_search_params

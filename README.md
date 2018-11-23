@@ -1,5 +1,5 @@
 # ApiAuthentication
-Short description and motivation.
+This gem provides secure authentication for api-only rails applications using JWT standar.
 
 ## Usage
 How to use my plugin.

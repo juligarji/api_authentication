@@ -16,13 +16,12 @@ module ApiAuthentication
       before_create :to_lowercase
   
       # Exists validation
-      validates :email,:name,:lastname, presence: true, on: [:create, :update]
+      validates :email,:name, presence: true, on: [:create, :update]
   
       # Length Validation
       validates :username, length: {in: 6..18}, on: [:create, :update], allow_blank: true
       validates :email, length: {in: 4..50},  on: [:create, :update], allow_blank: true
       validates :name, length: {in: 2..40},  on: [:create, :update], allow_blank: true
-      validates :lastname, length: {in: 2..40},  on: [:create, :update], allow_blank: true
       validates :password, length: {in: 6..18}, on: [:create], allow_blank: true
       validates :password_confirmation, length: {in: 6..18}, on: [:create], allow_blank: true
       
@@ -32,7 +31,7 @@ module ApiAuthentication
       # Format validation
       validates :username, format: { with: /\A[a-z0-9\-\_]+\z/i, message: "can only contain letters,numbers and dash" }, allow_blank: true,  on: [:create, :update]
       validates :email, format: {with: /\A[a-z\@\-\_\.]+\z/i, message: "has an invalid format"},allow_blank: true,  on: [:create, :update]
-      validates :name,:lastname, format: {with: /\A[a-zàáâçéèêëîïiíôóûùüúÿñæœ\' ]+\z/i, message: "can only contain letters and numbers"},allow_blank: true,  on: [:create, :update]
+      validates :name, format: {with: /\A[a-zàáâçéèêëîïiíôóûùüúÿñæœ\' ]+\z/i, message: "can only contain letters and numbers"},allow_blank: true,  on: [:create, :update]
       
       # Uniqueness
       validates :email,:username,:login_token,:recovery_token,:confirmation_token,on: [:create, :update], uniqueness: true, allow_blank: true
@@ -55,7 +54,7 @@ module ApiAuthentication
       end
   
       def expose
-        self.slice(:id,:username,:email,:name,:lastname,:last_sign_in_at) 
+        self.slice(:id,:username,:email,:name,:last_sign_in_at) 
       end
   
       def self.find_by_auth(auth)
@@ -116,7 +115,6 @@ module ApiAuthentication
           self.email = self.email.try(:downcase).try(:gsub!,/\s+/,'') || self.email.try(:downcase)
           self.username = self.username.try(:downcase).try(:gsub!,/\s+/,'') || self.username.try(:downcase)
           self.name = self.name.try(:downcase).try(:gsub!,/\s+/,' ') || self.name.try(:downcase)
-          self.lastname = self.lastname.try(:downcase).try(:gsub!,/\s+/,' ') || self.lastname.try(:downcase)
         end
     end
   end

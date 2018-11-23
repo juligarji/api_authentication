@@ -1,5 +1,5 @@
 class Create<%= model.capitalize.pluralize %> < ActiveRecord::Migration[5.1]
-    def change
+    def change-
       create_table :<%= model.downcase.pluralize %> do |t|
   
          # Default data of the created user
@@ -7,7 +7,6 @@ class Create<%= model.capitalize.pluralize %> < ActiveRecord::Migration[5.1]
          t.string :email,                  limit: 50,   null: false,  default:"",   unique: true
    
          t.string :name,                   limit: 40,   null: false,  default: ""
-         t.string :lastname,               limit: 40,   null: false,  default: ""
         
          t.string :password,               limit:18
          t.string :password_digest
@@ -30,6 +29,10 @@ class Create<%= model.capitalize.pluralize %> < ActiveRecord::Migration[5.1]
    
          # Sign In Date
          t.datetime :last_sign_in_at
+         
+         # Custom parameters
+         
+          # ...
   
         t.timestamps
       end
